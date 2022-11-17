@@ -1,0 +1,8 @@
+# general
+node_modules
+tmp
+venv
+
+# python cahe
+src/scripts/lib/__pycache__
+
