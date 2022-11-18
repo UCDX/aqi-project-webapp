@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
+  <title>AQI Simulation</title>
+  <style>
+    .image-center {
+      display: block;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-OERcA2EqjJCMA+/3y+gxIOqMEjwtxJY7qPCqsdltbNJuaOe923+mo//f6V8Qbsw3" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/mathjs@11.3.3/lib/browser/math.js"></script>
+  <div id="app">
+    <nav class="navbar navbar-expand-lg bg-light">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">AQI Project</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+          <div class="navbar-nav">
+            <a class="nav-link" href="/views/aqi/aqi-dashboard">Dashboard</a>
+            <a class="nav-link active" href="#">Simulador</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="container">
+      <p class="h1 text-center">Simulador de la calidad del aire</p>
+      <div v-show="displayError">
+        <div class="alert alert-danger" role="alert">
+          Algo ha salido mal. Verifica que todos los campos estén llenos, que sean valores numéricos y que no haya espacios de más.
+          <strong>Revisa la consola de depuración para más detalles.</strong>
+        </div>
+      </div>
+      <div>
+        <select class="form-select" aria-label="Tipo de simulación" v-model="simulationType">
+          <option value="default">Tipo de simulación</option>
+          <option value="by_comps">Predecir por componentes</option>
+          <option value="generate_random_sample">Generar muestra sintética</option>
+        </select>
+      </div>
+      <div v-show="simulationType == 'default'">
+        <div class="alert alert-warning" role="alert">Selecciona una opción válida del simulador.</div>
+      </div>
+      <div v-show="simulationType == 'by_comps'">
+        <p class="h2 text-center">Predecir por componentes</p>
+        <div class="alert alert-info" role="alert">
+          <p>
+            <strong>Descripción:</strong> Predice el AQI para los valores especificados. Si se especifica más de un valore
+            para cada variable, se produce una serie de tiempo.
+          </p>
+          <p>
+            <strong>Uso:</strong> Llena todos los campos (componentes del aire) con con los valores deseados.
+            Todos los campos deben tener la misma cantidad de valores, y estos deben estar separados por un solo espacio.
+          </p>
+        </div>
+        <div v-if="predict_by_comps_result.length">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">co</th>
+                <th scope="col">no</th>
+                <th scope="col">no2</th>
+                <th scope="col">o3</th>
+                <th scope="col">so2</th>
+                <th scope="col">pm2.5</th>
+                <th scope="col">pm10</th>
+                <th scope="col">nh3</th>
+                <th scope="col">aqi</th>
+                <th scope="col">label</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row of predict_by_comps_result">
+                <td scope="row">{{row.co}}</td>
+                <td>{{row.no}}</td>
+                <td>{{row.no2}}</td>
+                <td>{{row.o3}}</td>
+                <td>{{row.so2}}</td>
+                <td>{{row.pm2_5}}</td>
+                <td>{{row.pm10}}</td>
+                <td>{{row.nh3}}</td>
+                <td>{{row.aqi}}</td>
+                <td>{{row.label}}</td>
+              </tr>
+            </tbody>
+          </table>
+          <img v-if="image_name" :src="'/api/resources/image/'+image_name" alt="time series" class="image-center">
+        </div>
+        <div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea1" class="form-label">CO</label>
+            <textarea v-model="co_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">NO</label>
+            <textarea v-model="no_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">NO2</label>
+            <textarea v-model="no2_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">O3</label>
+            <textarea v-model="o3_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">SO2</label>
+            <textarea v-model="so2_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">PM 2.5</label>
+            <textarea v-model="pm2_5_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">PM 10</label>
+            <textarea v-model="pm10_input" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="exampleFormControlTextarea2" class="form-label">NH3</label>
+            <textarea v-model="nh3_input" class="form-control" rows="1"></textarea>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" @click="execPredictByComps()">Calcular</button>
+      </div>
+      <!-- generator -->
+      <div v-show="simulationType == 'generate_random_sample'">
+        <p class="h2 text-center">Genera una muestra sintética</p>
+        <div class="alert alert-info" role="alert">
+          <p>
+            <strong>Descripción:</strong> Genera una serie de valores aleatorios con distribución normal para cada componente del aire.
+            Estos se usarán para calcular el AQI y desplegarlo en forma de serie de tiempo.
+          </p>
+          <p>
+            <strong>Uso:</strong> Llena la media y la desviación estandar para cada componente, y elige la cantidad de valores a generar.
+          </p>
+        </div>
+        <div v-if="predict_by_generated_sample.length">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">co</th>
+                <th scope="col">no</th>
+                <th scope="col">no2</th>
+                <th scope="col">o3</th>
+                <th scope="col">so2</th>
+                <th scope="col">pm2.5</th>
+                <th scope="col">pm10</th>
+                <th scope="col">nh3</th>
+                <th scope="col">aqi</th>
+                <th scope="col">label</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row of predict_by_generated_sample">
+                <td>{{row.co}}</td>
+                <td>{{row.no}}</td>
+                <td>{{row.no2}}</td>
+                <td>{{row.o3}}</td>
+                <td>{{row.so2}}</td>
+                <td>{{row.pm2_5}}</td>
+                <td>{{row.pm10}}</td>
+                <td>{{row.nh3}}</td>
+                <td>{{row.aqi}}</td>
+                <td>{{row.label}}</td>
+              </tr>
+            </tbody>
+          </table>
+          <img v-if="image_name_gen_sample" :src="'/api/resources/image/'+image_name_gen_sample" alt="time series" class="image-center">
+        </div>
+        <div>
+          <div class="mb-3">
+            <label class="form-label">Cantidad de valores</label>
+            <input type="number" v-model="sample_size" class="form-control" placeholder="Ej. 30">
+          </div>
+          <label class="form-label">CO</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="co_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="co_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">NO</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="no_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="no_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">NO2</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="no2_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="no2_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">O3</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="o3_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="o3_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">SO2</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="so2_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="so2_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">PM 2.5</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="pm2_5_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="pm2_5_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">PM 10</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="pm10_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="pm10_conf.sd" class="form-control">
+          </div>
+          <label class="form-label">NH3</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text">Media</span>
+            <input v-model="nh3_conf.mean" class="form-control">
+            <span class="input-group-text">Desviación estándar</span>
+            <input v-model="nh3_conf.sd" class="form-control">
+          </div>
+        </div>
+        <button type="button" @click="execGenerateRandomSample()" class="btn btn-primary">Calcular</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const { createApp } = Vue
+    app = createApp({
+      data() {
+        return {
+          //others
+          displayError: false,
+          simulationType: 'default',
+          // predict by comps
+          co_input: '',
+          no_input: '',
+          no2_input: '',
+          o3_input: '',
+          so2_input: '',
+          pm2_5_input: '',
+          pm10_input: '',
+          nh3_input: '',
+          predict_by_comps_result: [],
+          image_name: '',
+          // generate random. Positions [0] = mean, [1] = standard deviation
+          co_conf: {
+            mean: '',
+            sd: ''
+          },
+          no_conf: {
+            mean: '',
+            sd: ''
+          },
+          no2_conf: {
+            mean: '',
+            sd: ''
+          },
+          o3_conf: {
+            mean: '',
+            sd: ''
+          },
+          so2_conf: {
+            mean: '',
+            sd: ''
+          },
+          pm2_5_conf: {
+            mean: '',
+            sd: ''
+          },
+          pm10_conf: {
+            mean: '',
+            sd: ''
+          },
+          nh3_conf: {
+            mean: '',
+            sd: ''
+          },
+          sample_size: '',
+          predict_by_generated_sample: [],
+          image_name_gen_sample: '',
+        }
+      },
+      methods: {
+        execPredictByComps: async function() {
+          console.log('predict by comps')
+          this.displayError = false
+          let response = await fetch('/api/aqi-models/predict-by-comps', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              co: this.co_input,
+              no: this.no_input,
+              no2: this.no2_input,
+              o3: this.o3_input,
+              so2: this.so2_input,
+              pm2_5: this.pm2_5_input,
+              pm10: this.pm10_input,
+              nh3: this.nh3_input
+            })
+          })
+          let data = await response.json()
+          console.log(data)
+          if(!data.success) {
+            this.displayError = true
+            window.scrollTo(0, 0)
+            return
+          }
+          this.image_name = data.filename
+          this.predict_by_comps_result = []
+          for(let i = 0; i < data.predicted_labels.length; i++) {
+            this.predict_by_comps_result.push({
+              co: math.round(data.input_data.co[i], 4),
+              no: math.round(data.input_data.no[i], 4),
+              no2: math.round(data.input_data.no2[i], 4),
+              o3: math.round(data.input_data.o3[i], 4),
+              so2: math.round(data.input_data.so2[i], 4),
+              pm2_5: math.round(data.input_data.pm2_5[i], 4),
+              pm10: math.round(data.input_data.pm10[i], 4),
+              nh3: math.round(data.input_data.nh3[i], 4),
+              aqi: data.predicted_labels[i].aqi,
+              label: data.predicted_labels[i].label
+            })
+          }
+          window.scrollTo(0, 0)
+        },
+        execGenerateRandomSample: async function() {
+          console.log('generate random sample')
+          this.displayError = false
+          let response = await fetch('/api/aqi-models/generate-random-sample', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              co: this.co_conf,
+              no: this.no_conf,
+              no2: this.no2_conf,
+              o3: this.o3_conf,
+              so2: this.so2_conf,
+              pm2_5: this.pm2_5_conf,
+              pm10: this.pm10_conf,
+              nh3: this.nh3_conf,
+              sample_size: this.sample_size
+            })
+          })
+          let data = await response.json()
+          console.log(data)
+          if(!data.success) {
+            this.displayError = true
+            window.scrollTo(0, 0)
+            return
+          }
+          this.image_name_gen_sample = data.filename
+          this.predict_by_generated_sample = []
+          for(let i = 0; i < data.predicted_labels.length; i++) {
+            this.predict_by_generated_sample.push({
+              co: math.round(data.generated_sample.co[i], 4),
+              no: math.round(data.generated_sample.no[i], 4),
+              no2: math.round(data.generated_sample.no2[i], 4),
+              o3: math.round(data.generated_sample.o3[i], 4),
+              so2: math.round(data.generated_sample.so2[i], 4),
+              pm2_5: math.round(data.generated_sample.pm2_5[i], 4),
+              pm10: math.round(data.generated_sample.pm10[i], 4),
+              nh3: math.round(data.generated_sample.nh3[i], 4),
+              aqi: data.predicted_labels[i].aqi,
+              label: data.predicted_labels[i].label
+            })
+          }
+          window.scrollTo(0, 0)
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>

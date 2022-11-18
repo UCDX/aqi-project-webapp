@@ -2,6 +2,7 @@
 node_modules
 tmp
 venv
+etc/.env
 
 # python cahe
 src/scripts/lib/__pycache__
